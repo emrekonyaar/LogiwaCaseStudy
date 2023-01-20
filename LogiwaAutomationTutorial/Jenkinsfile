@@ -1,0 +1,39 @@
+pipeline {
+    agent { dockerfile {
+                   filename 'Dockerfile'
+                   dir '/gauge'
+                   label 'dockerRun'
+                   additionalBuildArgs  '--build-arg version=1.0.2'
+                   args '-v /tmp:/tmp'
+               }}
+
+    environment {
+        COMPOSE_FILE = "docker-compose.yml"
+    }
+    stages {
+            stage('test') {
+            steps {
+                    withEnv(["PATH=$PATH:~/.local/bin"]){
+                            sh "bash test.sh"
+                        }
+                }
+            }
+            stage("Build and start test image") {
+                    steps {
+                        sh "docker build ."
+                        sh "docker-compose up -d --scale chrome=5"
+                    }
+            }
+            stage("Run Tests") {
+                steps{
+                    sh "mvn test-compile gauge:execute -DinParallel=true -Denv=remote -DspecsDir=specs"
+                }
+        }
+
+            stage("Kill Image") {
+                steps{
+                    sh "docker-compose down"
+                }
+        }
+    }
+ }
